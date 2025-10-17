@@ -3,7 +3,7 @@ name: Build & Deploy .NET Core to IIS
 on:
   push:
     branches:
-      - main   # فقط وقتی برنچ main آپدیت شود اجرا می‌شود
+      - master   # فقط وقتی برنچ main آپدیت شود اجرا می‌شود
 
 jobs:
   deploy:
