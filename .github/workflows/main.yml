@@ -3,19 +3,20 @@ name: Build & Deploy .NET Core to IIS
 on:
   push:
     branches:
-      - master   # اجرا فقط هنگام push روی برنچ main
+      - main   # فقط وقتی برنچ main آپدیت شود اجرا می‌شود
 
 jobs:
   deploy:
-    runs-on: self-hosted  # باید runner ویندوزی شخصی باشد
+    runs-on: self-hosted   # runner باید ویندوزی باشد
+
     steps:
-      # 1️⃣ دانلود سورس از GitHub
+      # 1️⃣ دریافت سورس از GitHub
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # تا کل تاریخچه‌ی git گرفته شود (در صورت نیاز)
+          fetch-depth: 0
 
-      # 2️⃣ کپی پروژه به مسیر مشخص روی سرور
+      # 2️⃣ کپی کد پروژه به مسیر محلی روی سرور
       - name: Copy repository to deploy directory
         shell: pwsh
         run: |
@@ -28,42 +29,59 @@ jobs:
           Copy-Item -Path "$src" -Destination $dst -Recurse -Force
           Write-Host "✅ Source copied successfully."
 
-      # 3️⃣ نصب SDK مورد نیاز
+      # 3️⃣ نصب SDK
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'  # نسخه‌ی مناسب پروژه‌ات
+          dotnet-version: '8.0.x'   # نسخه مورد نیاز خودت
 
-      # 4️⃣ مرحله‌ی Restore
+      # 4️⃣ Restore پکیج‌ها
       - name: Restore NuGet packages
         shell: pwsh
-        run: dotnet restore "C:\deploy\myapp\MyApp.csproj"
+        run: |
+          cd "C:\deploy\myapp"
+          Write-Host "🔄 Restoring NuGet packages..."
+          dotnet restore
+          if ($LASTEXITCODE -ne 0) { throw "❌ Restore failed." }
 
       # 5️⃣ Build پروژه
       - name: Build project
         shell: pwsh
-        run: dotnet build "C:\deploy\myapp\MyApp.csproj" --configuration Release
+        run: |
+          cd "C:\deploy\myapp"
+          Write-Host "⚙️ Building project..."
+          dotnet build --configuration Release
+          if ($LASTEXITCODE -ne 0) { throw "❌ Build failed." }
 
-      # 6️⃣ Publish پروژه
+      # 6️⃣ Publish خروجی نهایی
       - name: Publish project
         shell: pwsh
-        run: dotnet publish "C:\deploy\myapp\MyApp.csproj" --configuration Release --output "C:\deploy\myapp\publish"
+        run: |
+          cd "C:\deploy\myapp"
+          Write-Host "🚀 Publishing project..."
+          dotnet publish --configuration Release --output "C:\deploy\myapp\publish"
+          if ($LASTEXITCODE -ne 0) { throw "❌ Publish failed." }
 
-      # 7️⃣ کپی خروجی در مسیر IIS
-      - name: Deploy to IIS path
+      # 7️⃣ کپی خروجی فایل‌ها داخل مسیر IIS
+      - name: Deploy to IIS site
         shell: pwsh
         run: |
           $publishPath = "C:\deploy\myapp\publish"
-          $targetPath  = "C:\inetpub\wwwroot"
-          Write-Host "🚀 Deploying published files to $targetPath ..."
-          if (Test-Path $targetPath) {
-              Copy-Item -Path "$publishPath\*" -Destination $targetPath -Recurse -Force
-              Write-Host "✅ Deployment completed successfully."
+          $iisPath = "C:\inetpub\wwwroot"
+          Write-Host "📂 Copying published files to IIS directory..."
+          if (Test-Path $publishPath -and Test-Path $iisPath) {
+              Copy-Item -Path "$publishPath\*" -Destination $iisPath -Recurse -Force
+              Write-Host "✅ Files copied successfully to IIS."
           } else {
-              Write-Error "❌ Target path not found: $targetPath"
+              Write-Error "❌ Publish or IIS path not found."
+              exit 1
           }
 
-      # 8️⃣ ریستارت IIS (اختیاری)
-      - name: Restart IIS Service
+      # 8️⃣ ریستارت IIS
+      - name: Restart IIS
         shell: pwsh
-        run: iisreset
+        run: |
+          Write-Host "🔁 Restarting IIS service..."
+          iisreset
+          if ($LASTEXITCODE -ne 0) { throw "❌ IIS restart failed." }
+          Write-Host "✅ IIS restarted successfully."
