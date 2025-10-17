@@ -1,0 +1,69 @@
+name: Build & Deploy .NET Core to IIS
+
+on:
+  push:
+    branches:
+      - main   # اجرا فقط هنگام push روی برنچ main
+
+jobs:
+  deploy:
+    runs-on: self-hosted  # باید runner ویندوزی شخصی باشد
+    steps:
+      # 1️⃣ دانلود سورس از GitHub
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # تا کل تاریخچه‌ی git گرفته شود (در صورت نیاز)
+
+      # 2️⃣ کپی پروژه به مسیر مشخص روی سرور
+      - name: Copy repository to deploy directory
+        shell: pwsh
+        run: |
+          $src = "${{ github.workspace }}"
+          $dst = "C:\deploy\myapp"
+          Write-Host "📦 Copying source code from $src to $dst ..."
+          if (Test-Path $dst) {
+              Remove-Item $dst -Recurse -Force
+          }
+          Copy-Item -Path "$src" -Destination $dst -Recurse -Force
+          Write-Host "✅ Source copied successfully."
+
+      # 3️⃣ نصب SDK مورد نیاز
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'  # نسخه‌ی مناسب پروژه‌ات
+
+      # 4️⃣ مرحله‌ی Restore
+      - name: Restore NuGet packages
+        shell: pwsh
+        run: dotnet restore "C:\deploy\myapp\MyApp.csproj"
+
+      # 5️⃣ Build پروژه
+      - name: Build project
+        shell: pwsh
+        run: dotnet build "C:\deploy\myapp\MyApp.csproj" --configuration Release
+
+      # 6️⃣ Publish پروژه
+      - name: Publish project
+        shell: pwsh
+        run: dotnet publish "C:\deploy\myapp\MyApp.csproj" --configuration Release --output "C:\deploy\myapp\publish"
+
+      # 7️⃣ کپی خروجی در مسیر IIS
+      - name: Deploy to IIS path
+        shell: pwsh
+        run: |
+          $publishPath = "C:\deploy\myapp\publish"
+          $targetPath  = "C:\inetpub\wwwroot"
+          Write-Host "🚀 Deploying published files to $targetPath ..."
+          if (Test-Path $targetPath) {
+              Copy-Item -Path "$publishPath\*" -Destination $targetPath -Recurse -Force
+              Write-Host "✅ Deployment completed successfully."
+          } else {
+              Write-Error "❌ Target path not found: $targetPath"
+          }
+
+      # 8️⃣ ریستارت IIS (اختیاری)
+      - name: Restart IIS Service
+        shell: pwsh
+        run: iisreset
