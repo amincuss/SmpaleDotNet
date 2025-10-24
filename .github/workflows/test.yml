@@ -1,0 +1,8 @@
+name: .net cicd
+on:
+  push:
+     branches:
+       - main  
+jobs:
+   deploy:
+      runs-on: selfself-hosted
