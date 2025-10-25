@@ -5,4 +5,19 @@ on:
        - main  
 jobs:
    deploy:
-      runs-on: selfself-hosted
+      runs-on: self-hosted
+      steps:
+        - name: copy repository
+          uses: actions/checkout@v4
+
+        - name: copy from workspace
+          shell: pwsh
+          run: |
+            $source = " ${{ github.workspace}} "
+            $dest = "D:\SourceNet"
+            Copy-Item -Path $source -Destination $des -Recurse -Force
+            Write-host " copy ok"
+
+                  
+
+    
