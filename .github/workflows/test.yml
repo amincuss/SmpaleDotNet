@@ -10,7 +10,7 @@ jobs:
         - name: copy repository
           uses: actions/checkout@v4
 
-        - name: copy from workspace
+        - name: copy from workspaces
           shell: pwsh
           run: |
             $source = " ${{ github.workspace}} "
